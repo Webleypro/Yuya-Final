@@ -1,237 +1,197 @@
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
 import hashlib
 import random
 import json
 import os
-import time
+import re
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import re
-from urllib.request import Request, urlopen
-from urllib.parse import quote
-from html.parser import HTMLParser
+import requests
+from bs4 import BeautifulSoup
+import time
+from datetime import datetime
 
-class HTMLStripper(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.reset()
-        self.strict = False
-        self.convert_charrefs = True
-        self.text = []
+app = Flask(__name__, static_folder='../frontend')
+CORS(app)
+
+# Configuration email
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+SENDER_EMAIL = "elammariachraf351@gmail.com"
+SENDER_PASSWORD = "slvt zmtn bevd iwqn"  # Utilisez un mot de passe d'application Google
+
+class User:
+    def __init__(self, user_id, email, password_hash, status="inactive"):
+        self.user_id = user_id
+        self.email = email
+        self.password_hash = password_hash
+        self.status = status
+
+def save_user(user):
+    with open('users.txt', 'a') as f:
+        f.write(f"{user.user_id}:{user.email}:{user.password_hash}:{user.status}\n")
+
+def get_user(email):
+    if not os.path.exists('users.txt'):
+        return None
+    with open('users.txt', 'r') as f:
+        for line in f:
+            user_id, user_email, password_hash, status = line.strip().split(':')
+            if user_email == email:
+                return User(user_id, user_email, password_hash, status)
+    return None
+
+def send_activation_code(email, code):
+    msg = MIMEMultipart()
+    msg['From'] = SENDER_EMAIL
+    msg['To'] = email
+    msg['Subject'] = "Code d'activation Yuya"
     
-    def handle_data(self, d):
-        self.text.append(d)
+    body = f"Votre code d'activation est : {code}"
+    msg.attach(MIMEText(body, 'plain'))
     
-    def get_data(self):
-        return ''.join(self.text)
-
-class YuyaAI:
-    def __init__(self):
-        self.knowledge_file = "knowledge.txt"
-        self.users_file = "users.txt"
-        self.conversations_dir = "conversations"
-        self.smtp_email = "elammariachraf351@gmail.com"
-        
-        # Création des fichiers et dossiers nécessaires
-        for file in [self.knowledge_file, self.users_file]:
-            if not os.path.exists(file):
-                open(file, 'a').close()
-        
-        if not os.path.exists(self.conversations_dir):
-            os.makedirs(self.conversations_dir)
-
-    def generate_user_id(self):
-        """Génère un ID utilisateur unique à 10 chiffres"""
-        while True:
-            user_id = ''.join([str(random.randint(0, 9)) for _ in range(10)])
-            if not self._check_user_id_exists(user_id):
-                return user_id
-
-    def _check_user_id_exists(self, user_id):
-        """Vérifie si l'ID utilisateur existe déjà"""
-        if os.path.exists(self.users_file):
-            with open(self.users_file, 'r') as f:
-                for line in f:
-                    if line.startswith(user_id + ':'):
-                        return True
+    try:
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Erreur d'envoi d'email: {str(e)}")
         return False
 
-    def hash_password(self, password):
-        """Hash le mot de passe avec SHA-256"""
-        return hashlib.sha256(password.encode()).hexdigest()
-
-    def generate_activation_code(self):
-        """Génère un code d'activation à 4 chiffres"""
-        return ''.join([str(random.randint(0, 9)) for _ in range(4)])
-
-    def send_activation_email(self, email, code):
-        """Envoie un email avec le code d'activation"""
-        try:
-            msg = MIMEMultipart()
-            msg['From'] = self.smtp_email
-            msg['To'] = email
-            msg['Subject'] = "Code d'activation Yuya"
+def search_web(query):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+    
+    try:
+        response = requests.get(f"https://www.google.com/search?q={query}", headers=headers)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        results = []
+        
+        for div in soup.find_all('div', class_='g'):
+            title = div.find('h3')
+            link = div.find('a')
+            snippet = div.find('div', class_='VwiC3b')
             
-            body = f"Votre code d'activation est : {code}"
-            msg.attach(MIMEText(body, 'plain'))
-            
-            # Note: Dans une implémentation réelle, il faudrait configurer un serveur SMTP
-            # Cette partie est simplifiée pour l'exemple
-            print(f"Email envoyé à {email} avec le code {code}")
-            return True
-        except Exception as e:
-            print(f"Erreur d'envoi d'email: {str(e)}")
-            return False
+            if title and link and snippet:
+                results.append({
+                    'title': title.text,
+                    'link': link['href'],
+                    'snippet': snippet.text
+                })
+        
+        return results[:3]  # Retourne les 3 premiers résultats
+    except Exception as e:
+        print(f"Erreur de recherche: {str(e)}")
+        return []
 
-    def register_user(self, email, password):
-        """Inscrit un nouvel utilisateur"""
-        if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-            return {"success": False, "message": "Email invalide"}
-        
-        # Vérification si l'email existe déjà
-        with open(self.users_file, 'r') as f:
-            for line in f:
-                if email in line:
-                    return {"success": False, "message": "Email déjà utilisé"}
-        
-        user_id = self.generate_user_id()
-        hashed_password = self.hash_password(password)
-        activation_code = self.generate_activation_code()
-        
-        # Sauvegarde de l'utilisateur avec statut inactif
-        with open(self.users_file, 'a') as f:
-            f.write(f"{user_id}:{email}:{hashed_password}:inactive:{activation_code}\n")
-        
-        # Envoi du code d'activation
-        if self.send_activation_email(email, activation_code):
-            return {
-                "success": True,
-                "message": "Inscription réussie. Veuillez vérifier votre email pour le code d'activation.",
-                "user_id": user_id
-            }
+def save_conversation(user_id, query, response):
+    filename = f"conversations/{user_id}.json"
+    os.makedirs('conversations', exist_ok=True)
+    
+    conversation = {
+        'timestamp': datetime.now().isoformat(),
+        'query': query,
+        'response': response
+    }
+    
+    try:
+        if os.path.exists(filename):
+            with open(filename, 'r') as f:
+                conversations = json.load(f)
         else:
-            return {"success": False, "message": "Erreur lors de l'envoi du code d'activation"}
-
-    def activate_account(self, user_id, code):
-        """Active le compte utilisateur avec le code reçu"""
-        lines = []
-        found = False
-        success = False
-        
-        with open(self.users_file, 'r') as f:
-            lines = f.readlines()
-        
-        for i, line in enumerate(lines):
-            if line.startswith(f"{user_id}:"):
-                found = True
-                parts = line.strip().split(':')
-                if len(parts) >= 5 and parts[3] == "inactive" and parts[4] == code:
-                    lines[i] = f"{user_id}:{parts[1]}:{parts[2]}:active\n"
-                    success = True
-                break
-        
-        if found and success:
-            with open(self.users_file, 'w') as f:
-                f.writelines(lines)
-            return {"success": True, "message": "Compte activé avec succès"}
-        
-        return {"success": False, "message": "Code d'activation invalide"}
-
-    def login(self, email, password):
-        """Authentifie un utilisateur"""
-        hashed_password = self.hash_password(password)
-        
-        with open(self.users_file, 'r') as f:
-            for line in f:
-                parts = line.strip().split(':')
-                if len(parts) >= 4 and parts[1] == email and parts[2] == hashed_password:
-                    if parts[3] == "active":
-                        return {
-                            "success": True,
-                            "message": "Connexion réussie",
-                            "user_id": parts[0]
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "message": "Compte non activé"
-                        }
-        
-        return {"success": False, "message": "Email ou mot de passe incorrect"}
-
-    def search_web(self, query):
-        """Recherche des informations sur le web sans API"""
-        try:
-            encoded_query = quote(query)
-            # Simulation d'une recherche web simple (à adapter selon les besoins)
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            req = Request(
-                f"https://ddg.gg/search?q={encoded_query}",
-                headers=headers
-            )
-            response = urlopen(req).read().decode()
+            conversations = []
             
-            # Extraction et nettoyage du texte
-            stripper = HTMLStripper()
-            stripper.feed(response)
-            text = stripper.get_data()
+        conversations.append(conversation)
+        
+        with open(filename, 'w') as f:
+            json.dump(conversations, f, indent=2)
             
-            # Sauvegarde dans la base de connaissances
-            with open(self.knowledge_file, 'a') as f:
-                f.write(f"Q: {query}\nA: {text}\n\n")
-            
-            return text
-        except Exception as e:
-            return f"Erreur lors de la recherche : {str(e)}"
+    except Exception as e:
+        print(f"Erreur de sauvegarde de conversation: {str(e)}")
 
-    def save_conversation(self, user_id, message, response):
-        """Sauvegarde une conversation"""
-        conversation_file = os.path.join(
-            self.conversations_dir,
-            f"conversation_{user_id}.txt"
-        )
-        
-        with open(conversation_file, 'a') as f:
-            f.write(f"User: {message}\nYuya: {response}\n\n")
+@app.route('/')
+def serve_frontend():
+    return send_from_directory('../frontend', 'index.html')
 
-    def get_conversation_history(self, user_id):
-        """Récupère l'historique des conversations"""
-        conversation_file = os.path.join(
-            self.conversations_dir,
-            f"conversation_{user_id}.txt"
-        )
-        
-        if os.path.exists(conversation_file):
-            with open(conversation_file, 'r') as f:
-                return f.read()
-        return ""
+@app.route('/<path:path>')
+def serve_static(path):
+    return send_from_directory('../frontend', path)
 
-    def process_query(self, user_id, query):
-        """Traite une requête utilisateur"""
-        # Recherche dans la base de connaissances locale
-        response = None
-        with open(self.knowledge_file, 'r') as f:
-            content = f.read()
-            if query in content:
-                response = content.split(query)[1].split('\n\n')[0].strip()
-        
-        # Si pas trouvé, recherche sur le web
-        if not response:
-            print("Recherche sur Internet...")
-            response = self.search_web(query)
-        
-        # Sauvegarde de la conversation
-        self.save_conversation(user_id, query, response)
-        
-        return {
-            "success": True,
-            "response": response,
-            "source": "Internet" if not response else "Base de connaissances"
-        }
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+    
+    if get_user(email):
+        return jsonify({'error': 'Email déjà utilisé'}), 400
+    
+    user_id = str(random.randint(1000000000, 9999999999))
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    activation_code = str(random.randint(1000, 9999))
+    
+    if send_activation_code(email, activation_code):
+        user = User(user_id, email, password_hash)
+        save_user(user)
+        return jsonify({'message': 'Inscription réussie', 'activation_code': activation_code})
+    else:
+        return jsonify({'error': "Erreur d'envoi du code d'activation"}), 500
 
-# Instance globale de l'IA
-yuya = YuyaAI()
+@app.route('/api/activate', methods=['POST'])
+def activate():
+    data = request.json
+    email = data.get('email')
+    code = data.get('code')
+    
+    # Dans un cas réel, vous devriez vérifier le code avec celui stocké
+    # Ici, nous simulons simplement l'activation
+    user = get_user(email)
+    if user and user.status == "inactive":
+        # Mettre à jour le statut de l'utilisateur
+        # Dans un cas réel, vous devriez mettre à jour le fichier users.txt
+        return jsonify({'message': 'Compte activé avec succès'})
+    return jsonify({'error': "Erreur d'activation"}), 400
 
-# Point d'entrée pour le serveur web (à implémenter selon les besoins)
-if __name__ == "__main__":
-    print("Yuya AI Backend démarré...")
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+    
+    user = get_user(email)
+    if user and user.password_hash == hashlib.sha256(password.encode()).hexdigest():
+        return jsonify({'message': 'Connexion réussie', 'user_id': user.user_id})
+    return jsonify({'error': 'Identifiants invalides'}), 401
+
+@app.route('/api/ask', methods=['POST'])
+def ask():
+    data = request.json
+    query = data.get('query')
+    user_id = data.get('user_id')
+    
+    # Recherche sur le web
+    print(f"Recherche sur Internet pour: {query}")
+    results = search_web(query)
+    
+    # Formatage de la réponse
+    response = {
+        'answer': "Je recherche des informations pertinentes...",
+        'sources': results
+    }
+    
+    # Sauvegarde de la conversation
+    save_conversation(user_id, query, response)
+    
+    return jsonify(response)
+
+if __name__ == '__main__':
+    print("=== Démarrage du serveur Yuya ===")
+    print("Le serveur est accessible à l'adresse: http://localhost:5000")
+    print("Appuyez sur Ctrl+C pour arrêter le serveur")
+    app.run(debug=True, port=5000)

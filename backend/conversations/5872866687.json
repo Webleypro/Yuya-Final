@@ -1,0 +1,18 @@
+[
+  {
+    "timestamp": "2024-11-17T16:20:47.901350",
+    "query": "Quelle est l'animal le plus grand du monde ?",
+    "response": {
+      "answer": "Je recherche des informations pertinentes...",
+      "sources": []
+    }
+  },
+  {
+    "timestamp": "2024-11-17T16:21:31.844805",
+    "query": "Salut",
+    "response": {
+      "answer": "Je recherche des informations pertinentes...",
+      "sources": []
+    }
+  }
+]

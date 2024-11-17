@@ -3,39 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yuya AI</title>
+    <title>Yuya - IA Autonome</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="dark-mode">
     <div class="grid-background"></div>
     
-    <!-- Page de connexion/inscription -->
+    <!-- Page de connexion -->
     <div id="auth-container" class="container">
         <div class="auth-box">
+            <h1>Yuya</h1>
             <div class="tabs">
-                <button class="tab active" onclick="switchTab('login')">Connexion</button>
-                <button class="tab" onclick="switchTab('register')">Inscription</button>
+                <button class="tab active" onclick="showLogin()">Connexion</button>
+                <button class="tab" onclick="showRegister()">Inscription</button>
             </div>
             
             <!-- Formulaire de connexion -->
             <form id="login-form" class="auth-form">
                 <input type="email" placeholder="Email" required>
                 <input type="password" placeholder="Mot de passe" required>
-                <button type="submit" class="btn-primary">Se connecter</button>
+                <button type="submit" class="gradient-button">Se connecter</button>
             </form>
             
             <!-- Formulaire d'inscription -->
             <form id="register-form" class="auth-form hidden">
                 <input type="email" placeholder="Email" required>
                 <input type="password" placeholder="Mot de passe" required>
-                <button type="submit" class="btn-primary">S'inscrire</button>
+                <button type="submit" class="gradient-button">S'inscrire</button>
             </form>
             
-            <!-- Formulaire de code d'activation -->
+            <!-- Code d'activation -->
             <form id="activation-form" class="auth-form hidden">
                 <input type="text" placeholder="Code d'activation" maxlength="4" required>
-                <button type="submit" class="btn-primary">Activer le compte</button>
+                <button type="submit" class="gradient-button">Activer le compte</button>
             </form>
         </div>
     </div>
@@ -46,29 +47,27 @@
         <div id="sidebar" class="sidebar">
             <div class="sidebar-header">
                 <h2>Conversations</h2>
-                <button id="toggle-sidebar" class="btn-icon">≡</button>
+                <button onclick="toggleSidebar()" class="close-button">×</button>
             </div>
             <div id="conversations-list" class="conversations-list">
-                <!-- Les conversations seront ajoutées dynamiquement ici -->
+                <!-- Les conversations seront ajoutées ici dynamiquement -->
             </div>
         </div>
         
         <!-- Zone principale -->
         <div class="main-content">
+            <button onclick="toggleSidebar()" class="menu-button">☰</button>
             <div id="chat-container" class="chat-container">
-                <!-- Les messages seront ajoutés dynamiquement ici -->
+                <!-- Les messages seront ajoutés ici dynamiquement -->
             </div>
-            
-            <!-- Zone de saisie -->
             <div class="input-container">
-                <textarea id="user-input" placeholder="Posez votre question à Yuya..." rows="1"></textarea>
-                <button id="send-button" class="btn-primary">Envoyer</button>
+                <input type="text" id="user-input" placeholder="Posez votre question..." />
+                <button onclick="sendMessage()" class="send-button">
+                    <span>Envoyer</span>
+                </button>
             </div>
         </div>
     </div>
-    
-    <!-- Indicateur de statut -->
-    <div id="status-indicator" class="status-indicator"></div>
     
     <script src="script.js"></script>
 </body>

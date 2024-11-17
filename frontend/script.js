@@ -1,196 +1,220 @@
 // Variables globales
-let currentUserId = null;
-let isAuthenticated = false;
-let currentConversationId = null;
-
-// Configuration de base
-const API_BASE_URL = 'http://localhost:5000';
-
-// Éléments du DOM
-const authContainer = document.getElementById('auth-container');
-const mainContainer = document.getElementById('main-container');
-const sidebar = document.getElementById('sidebar');
-const chatContainer = document.getElementById('chat-container');
-const userInput = document.getElementById('user-input');
-const sendButton = document.getElementById('send-button');
-const statusIndicator = document.getElementById('status-indicator');
-const toggleSidebarButton = document.getElementById('toggle-sidebar');
-
-// Formulaires
-const loginForm = document.getElementById('login-form');
-const registerForm = document.getElementById('register-form');
-const activationForm = document.getElementById('activation-form');
-
-// Gestionnaires d'événements
-loginForm.addEventListener('submit', handleLogin);
-registerForm.addEventListener('submit', handleRegister);
-activationForm.addEventListener('submit', handleActivation);
-
-sendButton.addEventListener('click', handleSendMessage);
-userInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSendMessage();
-    }
-});
-
-toggleSidebarButton.addEventListener('click', () => {
-    sidebar.classList.toggle('collapsed');
-});
-
-userInput.addEventListener('input', () => {
-    userInput.style.height = 'auto';
-    userInput.style.height = `${userInput.scrollHeight}px`;
-});
+let currentUser = null;
+let conversationHistory = [];
+let sidebarOpen = false;
 
 // Fonctions d'authentification
-async function handleLogin(e) {
-    e.preventDefault();
-    const email = loginForm.querySelector('input[type="email"]').value;
-    const password = loginForm.querySelector('input[type="password"]').value;
+function showLogin() {
+    document.querySelector('#login-form').classList.remove('hidden');
+    document.querySelector('#register-form').classList.add('hidden');
+    document.querySelector('#activation-form').classList.add('hidden');
+    document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelector('.tab:first-child').classList.add('active');
+}
 
-    showStatus('Connexion en cours...');
+function showRegister() {
+    document.querySelector('#login-form').classList.add('hidden');
+    document.querySelector('#register-form').classList.remove('hidden');
+    document.querySelector('#activation-form').classList.add('hidden');
+    document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelector('.tab:last-child').classList.add('active');
+}
+
+async function handleLogin(event) {
+    event.preventDefault();
+    const form = document.querySelector('#login-form');
+    const email = form.querySelector('input[type="email"]').value;
+    const password = form.querySelector('input[type="password"]').value;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/login`, {
+        const response = await fetch('http://localhost:5000/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify({ email, password })
         });
-
+        
         const data = await response.json();
-
-        if (data.success) {
-            currentUserId = data.user_id;
-            isAuthenticated = true;
+        
+        if (response.ok) {
+            currentUser = { id: data.user_id, email };
             showMainInterface();
             loadConversations();
         } else {
-            showStatus(data.message, 'error');
+            alert(data.error);
         }
     } catch (error) {
-        showStatus('Erreur de connexion', 'error');
+        alert('Erreur de connexion au serveur');
     }
 }
 
-async function handleRegister(e) {
-    e.preventDefault();
-    const email = registerForm.querySelector('input[type="email"]').value;
-    const password = registerForm.querySelector('input[type="password"]').value;
-
-    showStatus('Inscription en cours...');
+async function handleRegister(event) {
+    event.preventDefault();
+    const form = document.querySelector('#register-form');
+    const email = form.querySelector('input[type="email"]').value;
+    const password = form.querySelector('input[type="password"]').value;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/register`, {
+        const response = await fetch('http://localhost:5000/api/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify({ email, password })
         });
-
+        
         const data = await response.json();
-
-        if (data.success) {
-            currentUserId = data.user_id;
-            showActivationForm();
-            showStatus('Veuillez vérifier votre email pour le code d\'activation');
+        
+        if (response.ok) {
+            document.querySelector('#activation-form').classList.remove('hidden');
+            document.querySelector('#register-form').classList.add('hidden');
         } else {
-            showStatus(data.message, 'error');
+            alert(data.error);
         }
     } catch (error) {
-        showStatus('Erreur lors de l\'inscription', 'error');
+        alert('Erreur de connexion au serveur');
     }
 }
 
-async function handleActivation(e) {
-    e.preventDefault();
-    const code = activationForm.querySelector('input').value;
-
-    showStatus('Activation en cours...');
+async function handleActivation(event) {
+    event.preventDefault();
+    const code = document.querySelector('#activation-form input').value;
+    const email = document.querySelector('#register-form input[type="email"]').value;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/activate`, {
+        const response = await fetch('http://localhost:5000/api/activate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: currentUserId, code }),
+            body: JSON.stringify({ email, code })
         });
-
+        
         const data = await response.json();
-
-        if (data.success) {
-            isAuthenticated = true;
-            showMainInterface();
-            showStatus('Compte activé avec succès');
+        
+        if (response.ok) {
+            alert('Compte activé avec succès');
+            showLogin();
         } else {
-            showStatus(data.message, 'error');
+            alert(data.error);
         }
     } catch (error) {
-        showStatus('Erreur lors de l\'activation', 'error');
+        alert('Erreur de connexion au serveur');
     }
 }
 
-// Gestion de l'interface principale
-async function handleSendMessage() {
-    const message = userInput.value.trim();
-    if (!message) return;
-
-    appendMessage(message, 'user');
-    userInput.value = '';
-    showStatus('Yuya réfléchit...');
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/query`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: currentUserId, query: message }),
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            appendMessage(data.response, 'ai', data.source);
-        } else {
-            showStatus('Erreur lors du traitement de la requête', 'error');
-        }
-    } catch (error) {
-        showStatus('Erreur de communication avec le serveur', 'error');
-    }
-}
-
-function appendMessage(content, type, source = null) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${type}`;
-    messageDiv.textContent = content;
-
-    if (type === 'ai' && source) {
-        const sourceLink = document.createElement('a');
-        sourceLink.href = source;
-        sourceLink.target = '_blank';
-        sourceLink.textContent = 'Source';
-        messageDiv.appendChild(sourceLink);
-    }
-
-    chatContainer.appendChild(messageDiv);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-}
-
-// Fonctions utilitaires
-function showStatus(message, type = 'info') {
-    statusIndicator.textContent = message;
-    statusIndicator.className = `status-indicator ${type}`;
-    statusIndicator.style.display = 'block';
-
-    setTimeout(() => {
-        statusIndicator.style.display = 'none';
-    }, 3000);
-}
-
+// Interface principale
 function showMainInterface() {
-    authContainer.classList.add('hidden');
-    mainContainer.classList.remove('hidden');
+    document.querySelector('#auth-container').classList.add('hidden');
+    document.querySelector('#main-container').classList.remove('hidden');
 }
 
-function showActivationForm() {
-    loginForm.classList.add('hidden');
-    registerForm.classList.add('hidden');
-    activationForm.classList.remove('hidden');
+function toggleSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    sidebarOpen = !sidebarOpen;
+    sidebar.classList.toggle('open');
 }
+
+async function loadConversations() {
+    // Cette fonction serait utilisée pour charger l'historique des conversations
+    // depuis le serveur
+    try {
+        const response = await fetch(`http://localhost:5000/api/conversations/${currentUser.id}`);
+        const data = await response.json();
+        
+        const conversationsList = document.querySelector('#conversations-list');
+        conversationsList.innerHTML = '';
+        
+        data.forEach(conversation => {
+            const element = document.createElement('div');
+            element.className = 'conversation-item';
+            element.textContent = conversation.title;
+            element.onclick = () => loadConversation(conversation.id);
+            conversationsList.appendChild(element);
+        });
+    } catch (error) {
+        console.error('Erreur lors du chargement des conversations:', error);
+    }
+}
+
+function createMessage(text, isUser = false) {
+    const message = document.createElement('div');
+    message.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
+    
+    if (!isUser) {
+        // Effet de frappe pour les réponses de l'IA
+        let index = 0;
+        message.textContent = '';
+        
+        function typeWriter() {
+            if (index < text.length) {
+                message.textContent += text.charAt(index);
+                index++;
+                setTimeout(typeWriter, 20);
+            }
+        }
+        
+        typeWriter();
+    } else {
+        message.textContent = text;
+    }
+    
+    return message;
+}
+
+async function sendMessage() {
+    const input = document.querySelector('#user-input');
+    const message = input.value.trim();
+    
+    if (!message) return;
+    
+    const chatContainer = document.querySelector('#chat-container');
+    chatContainer.appendChild(createMessage(message, true));
+    
+    input.value = '';
+    
+    try {
+        const response = await fetch('http://localhost:5000/api/ask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                query: message,
+                user_id: currentUser.id
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Création de la réponse avec mots-clés cliquables
+        const aiMessage = createMessage(data.answer, false);
+        
+        // Ajout des sources comme mots-clés cliquables
+        if (data.sources && data.sources.length > 0) {
+            const sourcesDiv = document.createElement('div');
+            sourcesDiv.className = 'sources';
+            data.sources.forEach(source => {
+                const keyword = document.createElement('span');
+                keyword.className = 'keyword';
+                keyword.textContent = source.title;
+                keyword.onclick = () => window.open(source.link, '_blank');
+                sourcesDiv.appendChild(keyword);
+            });
+            aiMessage.appendChild(sourcesDiv);
+        }
+        
+        chatContainer.appendChild(aiMessage);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        
+    } catch (error) {
+        alert('Erreur lors de l\'envoi du message');
+    }
+}
+
+// Event Listeners
+document.querySelector('#login-form').addEventListener('submit', handleLogin);
+document.querySelector('#register-form').addEventListener('submit', handleRegister);
+document.querySelector('#activation-form').addEventListener('submit', handleActivation);
+
+document.querySelector('#user-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        sendMessage();
+    }
+});
+
+// Initialize
+showLogin();
