@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yuya AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-mode">
+    <div class="grid-background"></div>
+    
+    <!-- Page de connexion/inscription -->
+    <div id="auth-container" class="container">
+        <div class="auth-box">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('login')">Connexion</button>
+                <button class="tab" onclick="switchTab('register')">Inscription</button>
+            </div>
+            
+            <!-- Formulaire de connexion -->
+            <form id="login-form" class="auth-form">
+                <input type="email" placeholder="Email" required>
+                <input type="password" placeholder="Mot de passe" required>
+                <button type="submit" class="btn-primary">Se connecter</button>
+            </form>
+            
+            <!-- Formulaire d'inscription -->
+            <form id="register-form" class="auth-form hidden">
+                <input type="email" placeholder="Email" required>
+                <input type="password" placeholder="Mot de passe" required>
+                <button type="submit" class="btn-primary">S'inscrire</button>
+            </form>
+            
+            <!-- Formulaire de code d'activation -->
+            <form id="activation-form" class="auth-form hidden">
+                <input type="text" placeholder="Code d'activation" maxlength="4" required>
+                <button type="submit" class="btn-primary">Activer le compte</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Interface principale -->
+    <div id="main-container" class="container hidden">
+        <!-- Menu latéral -->
+        <div id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h2>Conversations</h2>
+                <button id="toggle-sidebar" class="btn-icon">≡</button>
+            </div>
+            <div id="conversations-list" class="conversations-list">
+                <!-- Les conversations seront ajoutées dynamiquement ici -->
+            </div>
+        </div>
+        
+        <!-- Zone principale -->
+        <div class="main-content">
+            <div id="chat-container" class="chat-container">
+                <!-- Les messages seront ajoutés dynamiquement ici -->
+            </div>
+            
+            <!-- Zone de saisie -->
+            <div class="input-container">
+                <textarea id="user-input" placeholder="Posez votre question à Yuya..." rows="1"></textarea>
+                <button id="send-button" class="btn-primary">Envoyer</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Indicateur de statut -->
+    <div id="status-indicator" class="status-indicator"></div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
